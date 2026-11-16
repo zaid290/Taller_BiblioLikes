@@ -50,7 +50,7 @@ public class Lista {
         if (libro.getMeGusta() != 0) {
             throw new IllegalArgumentException("Un libro nuevo debe empezar con 0 me gusta.");
         }
-        if (binario(libro.getIsbn()) != -1) {
+        if (buscarIndicePorCodigo(libro.getIsbn()) != -1) {
             throw new IllegalArgumentException("Ya existe un libro con el ISBN " + libro.getIsbn() + ".");
         }
         biblioteca.add(libro);
@@ -102,27 +102,40 @@ public class Lista {
         return false;
     }
 
-    public ArrayList<Libro> buscar(String texto){
+    // R3: búsqueda lineal. Revisa TODOS los libros y devuelve los que tienen el texto
+    // en el título O en el autor, sin importar mayúsculas o minúsculas.
+    // Como recorre la colección principal en orden, los resultados salen ordenados por ISBN.
+    public ArrayList<Libro> buscarCoincidencias(String texto){
+        if(texto==null || texto.trim().isEmpty())
+            throw new IllegalArgumentException("Escriba un texto para buscar (no puede estar vacío).");
+        String consulta=texto.trim().toLowerCase();
         ArrayList<Libro> resultado=new ArrayList<>();
 
         for(Libro aux:biblioteca){
-            if(aux.getTitulo().contains(texto)){
+            String titulo=aux.getTitulo().toLowerCase();
+            String autor=aux.getAutor().toLowerCase();
+            // con || el libro se agrega una sola vez aunque coincida en título y autor
+            if(titulo.contains(consulta) || autor.contains(consulta)){
                 resultado.add(aux);
             }
         }
-        return resultado;
+        return resultado;   // si no hay coincidencias queda vacío, nunca null
     }
 
-    public int binario(int isbn){
+    // R4: búsqueda binaria propia sobre la colección principal (ordenada por ISBN).
+    // Devuelve el índice donde está el libro, o -1 si no existe.
+    public int buscarIndicePorCodigo(int isbn){
+        if(isbn<=0)
+            throw new IllegalArgumentException("El ISBN debe ser un número entero positivo.");
         if(biblioteca.isEmpty())
             return -1;
         int tam=biblioteca.size()-1;
         if(isbn<biblioteca.get(0).getIsbn()
-          ||isbn>biblioteca.get(tam).getIsbn())
+                ||isbn>biblioteca.get(tam).getIsbn())
             return -1;
-        int i=0;
-        int s=tam;
-        int c;
+        int i=0;      // límite inferior
+        int s=tam;    // límite superior
+        int c;        // posición central
         while(i<=s){
             c=(i+s)/2;
             int valor=biblioteca.get(c).getIsbn();
@@ -136,6 +149,28 @@ public class Lista {
         }
         return -1;
 
+    }
+
+    // Libro que está en una posición de la colección principal
+    // (por ejemplo, el índice que devuelve la búsqueda binaria).
+    public Libro obtenerLibro(int indice) {
+        return biblioteca.get(indice);
+    }
+
+    // R4: edita el libro identificado por su ISBN (no por la posición en la JList ni por el título).
+    // Primero valida TODO y solo después cambia los datos: así nunca queda un cambio a medias.
+    public void editarLibro(int isbn, String titulo, String autor, String categoria, int anioPublicacion) {
+        int indice = buscarIndicePorCodigo(isbn);
+        if (indice == -1) {
+            throw new IllegalArgumentException("No existe un libro con el ISBN " + isbn + ".");
+        }
+        validarDatos(titulo, autor, categoria, anioPublicacion);
+        Libro libro = biblioteca.get(indice);
+        libro.setTitulo(titulo.trim());
+        libro.setAutor(autor.trim());
+        libro.setCategoria(categoria);
+        libro.setAnioPublicacion(anioPublicacion);
+        // El ISBN no cambia, así que la colección sigue ordenada y no hace falta reordenar.
     }
 
     // Devuelve una COPIA: desde afuera nadie puede desordenar la colección principal.
