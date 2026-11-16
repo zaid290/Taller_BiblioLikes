@@ -66,6 +66,11 @@ public class Libro {
         return meGusta;
     }
 
+    // R5: cada clic válido en "Me gusta +1" suma uno. No hay setter: no se puede escribir a mano.
+    public void incrementarMeGusta() {
+        meGusta++;
+    }
+
     @Override
     public String toString() {
         return isbn + " | " + titulo + " | " + autor + " | Me gusta: " + meGusta;

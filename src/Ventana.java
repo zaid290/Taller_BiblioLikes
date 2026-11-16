@@ -1,4 +1,6 @@
 import javax.swing.*;
+import javax.swing.event.ChangeEvent;
+import javax.swing.event.ChangeListener;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 import java.awt.*;
@@ -48,6 +50,14 @@ public class Ventana {
     private JSpinner spiAnioEdicion;
     private JLabel lblMeGustaEdicion;
     private JButton btnGuardar;
+    private JButton btnMeGusta;
+
+    // ----- Pestaña Ranking -----
+    private JPanel panelRanking;
+    private JLabel lblRanking;
+    private DefaultListModel<String> modeloRanking;
+    private JList<String> lstRanking;
+    private JButton btnActualizar;
 
     private Lista biblioteca = new Lista();
 
@@ -66,12 +76,15 @@ public class Ventana {
         tabbedPane1 = new JTabbedPane();
         tabbedPane1.addTab("Registro", crearPestanaRegistro());
         tabbedPane1.addTab("Búsquedas y edición", crearPestanaBusquedas());
+        panelRanking = crearPestanaRanking();
+        tabbedPane1.addTab("Ranking", panelRanking);
 
         principal = new JPanel(new BorderLayout());
         principal.add(tabbedPane1, BorderLayout.CENTER);
 
         actualizarTotal();
         limpiarFormularioEdicion();
+        actualizarRanking();
 
         btnRegistrar.addActionListener(new ActionListener() {
             @Override
@@ -101,6 +114,28 @@ public class Ventana {
             @Override
             public void actionPerformed(ActionEvent e) {
                 guardarCambios();
+            }
+        });
+        // R5: el contador SOLO aumenta al pulsar este botón.
+        btnMeGusta.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                darMeGusta();
+            }
+        });
+        btnActualizar.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                actualizarRanking();
+            }
+        });
+        // R6: el ranking también se actualiza al entrar en su pestaña.
+        tabbedPane1.addChangeListener(new ChangeListener() {
+            @Override
+            public void stateChanged(ChangeEvent e) {
+                if (tabbedPane1.getSelectedComponent() == panelRanking) {
+                    actualizarRanking();
+                }
             }
         });
         // Al seleccionar un libro de la lista SOLO se muestra su detalle; no se cambia ningún dato.
@@ -196,6 +231,7 @@ public class Ventana {
         }
         actualizarTotal();
         refrescarResultados();   // si la búsqueda activa incluye al libro nuevo, aparece
+        actualizarRanking();
         mostrarMensaje("Libro registrado correctamente.\nTotal de libros: " + biblioteca.getCantidad());
         limpiarFormularioRegistro();
     }
@@ -259,6 +295,7 @@ public class Ventana {
         lblMeGustaEdicion = new JLabel();
         lblMeGustaEdicion.setFont(lblMeGustaEdicion.getFont().deriveFont(Font.BOLD, 14f));
         btnGuardar = new JButton("Guardar cambios");
+        btnMeGusta = new JButton("Me gusta +1");
 
         JPanel formulario = new JPanel(new GridLayout(0, 2, 8, 8));
         formulario.add(new JLabel("ISBN (no se edita):"));
@@ -276,6 +313,7 @@ public class Ventana {
 
         JPanel botones = new JPanel(new FlowLayout(FlowLayout.CENTER));
         botones.add(btnGuardar);
+        botones.add(btnMeGusta);
 
         JPanel contenidoEdicion = new JPanel(new BorderLayout(0, 10));
         contenidoEdicion.add(formulario, BorderLayout.NORTH);
@@ -442,6 +480,7 @@ public class Ventana {
         }
         int isbnEditado = isbnSeleccionado;
         refrescarResultados();
+        actualizarRanking();
         if (isbnSeleccionado == isbnEditado) {
             mostrarMensaje("Cambios guardados.");
         } else {
@@ -479,6 +518,70 @@ public class Ventana {
             }
         }
         // Si ya no está en los resultados, la selección queda vacía.
+    }
+
+    // ===================== Me gusta (R5) =====================
+
+    // Suma un me gusta al libro seleccionado. Sin selección válida solo avisa.
+    private void darMeGusta() {
+        if (isbnSeleccionado == -1) {
+            mostrarAviso("Primero busque y seleccione un libro para darle me gusta.");
+            return;
+        }
+        biblioteca.darMeGusta(isbnSeleccionado);
+        Libro libro = biblioteca.obtenerLibro(biblioteca.buscarIndicePorCodigo(isbnSeleccionado));
+        lblMeGustaEdicion.setText(String.valueOf(libro.getMeGusta()));
+        actualizarFilaResultados(libro);
+        actualizarRanking();
+    }
+
+    // Vuelve a dibujar la fila del libro en la JList (es el mismo objeto, ahora con el contador nuevo).
+    // No cambia la selección ni lo que se está escribiendo en el formulario.
+    private void actualizarFilaResultados(Libro libro) {
+        int fila = modeloResultados.indexOf(libro);
+        if (fila != -1) {
+            modeloResultados.set(fila, libro);
+        }
+    }
+
+    // ===================== Pestaña Ranking (R6) =====================
+
+    private JPanel crearPestanaRanking() {
+        lblRanking = new JLabel();
+        btnActualizar = new JButton("Actualizar");
+        modeloRanking = new DefaultListModel<>();
+        lstRanking = new JList<>(modeloRanking);
+        lstRanking.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 14));   // columnas alineadas
+
+        JPanel superior = new JPanel(new BorderLayout(10, 0));
+        superior.add(lblRanking, BorderLayout.CENTER);
+        superior.add(btnActualizar, BorderLayout.EAST);
+
+        JPanel panel = new JPanel(new BorderLayout(10, 10));
+        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        panel.add(superior, BorderLayout.NORTH);
+        panel.add(new JScrollPane(lstRanking), BorderLayout.CENTER);
+        return panel;
+    }
+
+    // Pide a Lista el ranking (una copia ordenada por me gusta) y lo muestra.
+    // Los empatados comparten posición: 1º, 1º, 1º, 4º...
+    private void actualizarRanking() {
+        ArrayList<Libro> ranking = biblioteca.obtenerRanking();
+        modeloRanking.clear();
+        int posicion = 0;
+        for (int i = 0; i < ranking.size(); i++) {
+            Libro libro = ranking.get(i);
+            // Si tiene distinto número de me gusta que el anterior, su posición es i + 1;
+            // si empata con el anterior, se queda con la misma posición.
+            if (i == 0 || libro.getMeGusta() != ranking.get(i - 1).getMeGusta()) {
+                posicion = i + 1;
+            }
+            modeloRanking.addElement(String.format("%3dº  %5d | %-34s | %d me gusta",
+                    posicion, libro.getIsbn(), libro.getTitulo(), libro.getMeGusta()));
+        }
+        lblRanking.setText("Ranking de popularidad: " + ranking.size()
+                + " libros, de más a menos me gusta (empates por ISBN ascendente).");
     }
 
     // ===================== Mensajes =====================

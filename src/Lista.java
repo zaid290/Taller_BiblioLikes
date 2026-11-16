@@ -173,6 +173,35 @@ public class Lista {
         // El ISBN no cambia, así que la colección sigue ordenada y no hace falta reordenar.
     }
 
+    // R5: suma un me gusta al libro con ese ISBN (lo encuentra con la búsqueda binaria).
+    public void darMeGusta(int isbn) {
+        int indice = buscarIndicePorCodigo(isbn);
+        if (indice == -1) {
+            throw new IllegalArgumentException("No existe un libro con el ISBN " + isbn + ".");
+        }
+        biblioteca.get(indice).incrementarMeGusta();
+    }
+
+    // R6: ranking de popularidad. Se ordena una COPIA de la colección principal con burbuja
+    // por me gusta descendente. La principal no se toca: sigue ordenada por ISBN para la binaria.
+    public ArrayList<Libro> obtenerRanking() {
+        ArrayList<Libro> ranking = new ArrayList<>(biblioteca);   // mismos objetos Libro, otra lista
+        int n = ranking.size();
+        for (int i = 0; i < n - 1; i++) {
+            for (int j = 0; j < n - 1 - i; j++) {
+                // Burbuja estable: solo se intercambia si el de la izquierda tiene MENOS me gusta.
+                // Si empatan no se mueven y, como la copia viene ordenada por ISBN,
+                // los empatados quedan con ISBN ascendente.
+                if (ranking.get(j).getMeGusta() < ranking.get(j + 1).getMeGusta()) {
+                    Libro aux = ranking.get(j);
+                    ranking.set(j, ranking.get(j + 1));
+                    ranking.set(j + 1, aux);
+                }
+            }
+        }
+        return ranking;
+    }
+
     // Devuelve una COPIA: desde afuera nadie puede desordenar la colección principal.
     public ArrayList<Libro> obtener(){
         return new ArrayList<>(biblioteca);
